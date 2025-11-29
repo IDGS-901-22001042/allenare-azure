@@ -106,7 +106,7 @@ stages:
             displayName: 'Deploy to Azure App Service (staging)'
             inputs:
               # 👇 Usa el nombre correcto de tu Conexión de Servicio (reemplaza si es necesario)
-              azureSubscription: 'AzureAllenareConnection'
+              azureSubscription: 'allenare-azure'
               # 👇 Ajusta si usas Windows App Service ('webApp')
               appType: 'webAppLinux'
               # 👇 Nombre exacto de tu App Service en Azure
