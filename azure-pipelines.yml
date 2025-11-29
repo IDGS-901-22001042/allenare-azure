@@ -91,7 +91,7 @@ stages:
       runOnce:
         deploy:
           steps:
-          # Descargar artefactos del stage de Build
+          # Descargar artefactos del stage de Build - de nuevo
           - task: DownloadBuildArtifacts@1
             inputs:
               buildType: 'current'
