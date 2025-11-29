@@ -48,9 +48,9 @@ stages:
         ArtifactName: 'drop'
       displayName: 'Publish Build Artifacts'
 
-# ======================
+# =======================
 # 2️⃣ TEST STAGE
-# ======================
+# =======================
 - stage: Test
   dependsOn: Build
   displayName: 'Test Stage'
