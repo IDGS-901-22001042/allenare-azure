@@ -1,0 +1,153 @@
+# ==========================================
+# PIPELINE CI/CD para Node.js + React (Vite) -> Deploy a Azure App Service
+# ==========================================
+
+trigger:
+  branches:
+    include:
+      - dev
+      - main
+
+pool:
+  vmImage: ubuntu-latest
+
+# NO definir NODE_ENV globalmente
+# variables:
+#  NODE_ENV: production
+
+stages:
+# ======================
+# 1️⃣ BUILD STAGE
+# ======================
+- stage: Build
+  displayName: 'Build Stage'
+  jobs:
+  - job: BuildJob
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+      displayName: 'Install Node.js 20'
+
+    - script: |
+        node -v
+        npm -v
+        echo "--- Cleaning npm cache and node_modules ---"
+        npm cache clean --force
+        rm -rf node_modules
+        echo "--- Running npm ci with legacy peer deps ---"
+        npm ci --legacy-peer-deps
+        echo "--- npm ci finished ---"
+        echo "--- Running build ---"
+        npx vite build
+      displayName: 'Clean, Install Dependencies and Build App'
+
+    - task: PublishBuildArtifacts@1
+      inputs:
+        PathtoPublish: 'dist'
+        ArtifactName: 'drop'
+      displayName: 'Publish Build Artifacts'
+
+# ======================
+# 2️⃣ TEST STAGE
+# ======================
+- stage: Test
+  dependsOn: Build
+  displayName: 'Test Stage'
+  jobs:
+  - job: TestJob
+    steps:
+    - task: NodeTool@0
+      inputs:
+        versionSpec: '20.x'
+      displayName: 'Install Node.js 20 (for Test)'
+
+    - script: |
+        echo "--- Installing dependencies for tests ---"
+        npm ci --legacy-peer-deps
+        echo "--- Running tests ---"
+        npm test
+      displayName: 'Install Deps & Run Tests'
+
+    - task: PublishTestResults@2
+      displayName: 'Publish Test Results JUnit'
+      condition: always()
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/junit.xml'
+        failTaskOnFailedTests: true
+
+# ======================
+# 3️⃣ DEPLOY STAGE to Azure App Service
+# ======================
+- stage: Deploy
+  dependsOn: Test
+  condition: succeeded()
+  displayName: 'Deploy Stage to Azure App Service'
+  jobs:
+  - deployment: DeployWeb
+    environment: 'staging'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          # Descargar artefactos del stage de Build - de nuevo
+          - task: DownloadBuildArtifacts@1
+            inputs:
+              buildType: 'current'
+              downloadType: 'single'
+              artifactName: 'drop'
+              # Descarga a una carpeta específica para la tarea de despliegue
+              downloadPath: '$(System.ArtifactsDirectory)/app'
+            displayName: 'Download Build Artifacts for Deployment'
+
+          # --- TAREA PARA DESPLEGAR A AZURE APP SERVICE ---
+          - task: AzureWebApp@1
+            displayName: 'Deploy to Azure App Service (staging)'
+            inputs:
+              # 👇 Usa el nombre correcto de tu Conexión de Servicio (reemplaza si es necesario)
+              azureSubscription: 'allenare-azure'
+              # 👇 Ajusta si usas Windows App Service ('webApp')
+              appType: 'webAppLinux'
+              # 👇 Nombre exacto de tu App Service en Azure
+              appName: 'allenare-azure'
+              # 👇 Ruta a la carpeta con los archivos construidos
+              package: '$(System.ArtifactsDirectory)/app/drop'
+              deploymentMethod: 'zipDeploy'
+
+          # --- PASO PARA CERRAR WORK ITEMS ESPECÍFICOS (opcional) ---
+          - task: AzureCLI@2
+            displayName: 'Close Deployed Work Items (27)'
+            condition: succeeded()
+            inputs:
+              azureSubscription: 'AzureAllenareConnection'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              addSpnToEnvironment: true
+              inlineScript: |
+                echo "Closing specified Work Items after successful deployment..."
+                WORK_ITEM_IDS_TO_CLOSE=(27)
+                
+                TARGET_STATE="Closed"
+                for WORK_ITEM_ID in "${WORK_ITEM_IDS_TO_CLOSE[@]}"; do
+                  echo "Attempting to update Work Item ID: $WORK_ITEM_ID to state '$TARGET_STATE'"
+                  az boards work-item update --id $WORK_ITEM_ID --state "$TARGET_STATE" --org "$(System.TeamFoundationCollectionUri)" --project "$(System.TeamProject)" --debug || echo "Warning: Failed to update work item $WORK_ITEM_ID."
+                done
+                echo "Finished attempting to close specified work items."
+
+# ======================
+# 4️⃣ MONITOR STAGE (Opcional)
+# ======================
+- stage: Monitor
+  dependsOn: Deploy
+  condition: succeeded()
+  displayName: 'Monitor Stage'
+  jobs:
+  - job: MonitorJob
+    steps:
+    - script: |
+        echo "--- Performing health check ---"
+        # 👇 URL PÚBLICA de tu App Service desplegada
+        curl -f -I https://allenare-azure-ftb2etd4a5cccxbz.canadacentral-01.azurewebsites.net || (echo "ERROR: Site unreachable or returned an error status" && exit 1)
+        echo "Health check passed!"
+      displayName: 'Check Deployment Health'
