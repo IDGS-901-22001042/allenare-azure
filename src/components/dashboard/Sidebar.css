@@ -1,0 +1,40 @@
+.sidebar {
+  width: 100px;
+  background-color: var(--bg-secondary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: space-around;
+  padding: 1rem 0;
+  height: 100%;
+  border-radius: 15px;
+}
+
+.sidebar a {
+  text-decoration: none;
+}
+
+.sidebar-icon {
+  width: 60px;
+  height: 60px;
+  background-color: var(--bg-tertiary);
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  cursor: pointer;
+  transition: background-color 0.3s ease;
+}
+
+/* Estilos para el icono cuando el enlace está activo o al pasar el ratón */
+.sidebar a.active .sidebar-icon,
+.sidebar-icon:hover {
+  background-color: var(--accent-color);
+}
+
+/* Asegúrate de que el icono activo tenga un fondo diferente */
+.sidebar a.active .sidebar-icon {
+  background-color: var(--accent-color);
+  /* Mismo color que el hover para consistencia */
+}
