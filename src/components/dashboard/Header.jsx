@@ -14,7 +14,7 @@ const Header = ({ showIcons = true, username = "(username)", email = "(correo)",
           />
         </Link>
         <div className="user-info">
-          <h1>Bienvenido, {username}!</h1>
+          <h1>Saludos, {username}!</h1>
           <p>{email}</p>
         </div>
       </div>
